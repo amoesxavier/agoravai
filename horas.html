@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#3498db">
+  <meta charset="UTF-8" />
+  <title>Controle de Horas</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      padding: 20px;
+      max-width: 500px;
+      margin: auto;
+      background-color: #f9f9f9;
+      color: #333;
+    }
+
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+    }
+
+    label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    input, button {
+      padding: 10px;
+      margin-top: 5px;
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 16px;
+    }
+
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+    }
+
+    #resetar {
+      background-color: #e74c3c;
+      margin-top: 5px;
+    }
+
+    #resetar:hover {
+      background-color: #c0392b;
+    }
+
+    #exportar {
+      background-color: #2ecc71;
+    }
+
+    #exportar:hover {
+      background-color: #27ae60;
+    }
+
+    .saldo {
+      margin-top: 15px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #2d3436;
+    }
+
+    #resultados {
+      margin-top: 20px;
+      background-color: #ecf0f1;
+      padding: 10px;
+      border-radius: 4px;
+    }
+
+    footer {
+      margin-top: 40px;
+      text-align: center;
+      font-size: 14px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <h1>Controle de Horas</h1>
+  
+  <label for="entrada">Hora de Entrada:</label>
+  <input type="time" id="entrada" required>
+
+  <label for="saida">Hora de Saída:</label>
+  <input type="time" id="saida" required>
+
+  <button onclick="registrarHoras()">Registrar</button>
+  <button id="resetar" onclick="resetarTudo()">Resetar</button>
+  <button id="exportar" onclick="exportarCSV()">Exportar CSV</button>
+
+  <div class="saldo" id="saldoTotal">Saldo Total: 0h</div>
+  <div id="resultados"></div>
+
+  <footer>
+    Criado por Amóes Xavier
+  </footer>
+
+  <script>
+    let saldoTotalMinutos = 0;
+    let historico = [];
+
+    // Carrega dados ao iniciar
+    window.onload = function () {
+      const dadosSalvos = localStorage.getItem('controleHoras');
+      if (dadosSalvos) {
+        const dados = JSON.parse(dadosSalvos);
+        saldoTotalMinutos = dados.saldo;
+        historico = dados.historico || [];
+        atualizarTela();
+      }
+    };
+
+    function registrarHoras() {
+      const entrada = document.getElementById('entrada').value;
+      const saida = document.getElementById('saida').value;
+
+      if (!entrada || !saida) {
+        alert("Preencha os dois campos de horário.");
+        return;
+      }
+
+      const [hEntrada, mEntrada] = entrada.split(":").map(Number);
+      const [hSaida, mSaida] = saida.split(":").map(Number);
+
+      const entradaMinutos = hEntrada * 60 + mEntrada;
+      const saidaMinutos = hSaida * 60 + mSaida;
+
+      const trabalhadoMin = saidaMinutos - entradaMinutos;
+      const saldoDia = trabalhadoMin - 360; // 6h = 360min
+      saldoTotalMinutos += saldoDia;
+
+      historico.push({
+        entrada,
+        saida,
+        trabalhado: trabalhadoMin,
+        saldo: saldoDia
+      });
+
+      salvarDados();
+      atualizarTela();
+    }
+
+    function atualizarTela() {
+      const resultados = document.getElementById('resultados');
+      resultados.innerHTML = '';
+
+      historico.forEach((item, index) => {
+        const horas = Math.floor(item.trabalhado / 60);
+        const minutos = item.trabalhado % 60;
+        const saldoHora = (item.saldo / 60).toFixed(2);
+        const sinal = item.saldo >= 0 ? "+" : "-";
+
+        resultados.innerHTML += `<p>Dia ${index + 1}: Entrada ${item.entrada}, Saída ${item.saida}, Trabalhou ${horas}h${minutos.toString().padStart(2, '0')}min (${sinal}${Math.abs(saldoHora)}h)</p>`;
+      });
+
+      const saldoHoras = Math.floor(saldoTotalMinutos / 60);
+      const saldoMin = Math.abs(saldoTotalMinutos % 60);
+      const sinal = saldoTotalMinutos >= 0 ? "+" : "-";
+      document.getElementById('saldoTotal').textContent = `Saldo Total: ${sinal}${Math.abs(saldoHoras)}h${saldoMin.toString().padStart(2, '0')}min`;
+    }
+
+    function salvarDados() {
+      localStorage.setItem('controleHoras', JSON.stringify({
+        saldo: saldoTotalMinutos,
+        historico: historico
+      }));
+    }
+
+    function resetarTudo() {
+      if (confirm("Tem certeza que deseja resetar tudo?")) {
+        localStorage.removeItem('controleHoras');
+        saldoTotalMinutos = 0;
+        historico = [];
+        atualizarTela();
+      }
+    }
+
+    function exportarCSV() {
+      if (historico.length === 0) {
+        alert("Nenhum dado para exportar.");
+        return;
+      }
+
+      let csv = "Dia,Entrada,Saída,Trabalhado (min),Saldo (min)\n";
+      historico.forEach((item, index) => {
+        csv += `${index + 1},${item.entrada},${item.saida},${item.trabalhado},${item.saldo}\n`;
+      });
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "controle_de_horas.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(() => console.log("Service Worker registrado"))
+        .catch(err => console.error("Erro ao registrar SW:", err));
+    }
+  </script>
+  
+</body>
+</html>
